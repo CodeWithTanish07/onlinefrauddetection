@@ -1,0 +1,83 @@
+{
+    "model_name": "Random Forest",
+    "dataset_rows": 284807,
+    "training_rows": 227845,
+    "test_rows": 56962,
+    "fraud_cases": 492,
+    "legitimate_cases": 284315,
+    "accuracy": 0.9995084442259752,
+    "fraud_precision": 0.9605263157894737,
+    "fraud_recall": 0.7448979591836735,
+    "fraud_f1_score": 0.8390804597701149,
+    "average_precision": 0.8591339923513692,
+    "roc_auc": 0.9520986521367129,
+    "confusion_matrix": [
+        [
+            56861,
+            3
+        ],
+        [
+            25,
+            73
+        ]
+    ],
+    "classification_report": {
+        "Legitimate": {
+            "precision": 0.9995605245578877,
+            "recall": 0.9999472425436128,
+            "f1-score": 0.9997538461538461,
+            "support": 56864.0
+        },
+        "Fraud": {
+            "precision": 0.9605263157894737,
+            "recall": 0.7448979591836735,
+            "f1-score": 0.8390804597701149,
+            "support": 98.0
+        },
+        "accuracy": 0.9995084442259752,
+        "macro avg": {
+            "precision": 0.9800434201736807,
+            "recall": 0.8724226008636431,
+            "f1-score": 0.9194171529619806,
+            "support": 56962.0
+        },
+        "weighted avg": {
+            "precision": 0.9994933683404215,
+            "recall": 0.9995084442259752,
+            "f1-score": 0.9994774163960145,
+            "support": 56962.0
+        }
+    },
+    "feature_columns": [
+        "Time",
+        "V1",
+        "V2",
+        "V3",
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V9",
+        "V10",
+        "V11",
+        "V12",
+        "V13",
+        "V14",
+        "V15",
+        "V16",
+        "V17",
+        "V18",
+        "V19",
+        "V20",
+        "V21",
+        "V22",
+        "V23",
+        "V24",
+        "V25",
+        "V26",
+        "V27",
+        "V28",
+        "Amount"
+    ]
+}
