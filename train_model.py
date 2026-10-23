@@ -14,6 +14,8 @@ from sklearn.metrics import (
     f1_score,
     average_precision_score,
     roc_auc_score,
+    roc_curve,
+    precision_recall_curve,
     confusion_matrix,
     classification_report,
 )
@@ -32,9 +34,7 @@ CONFUSION_PATH = MODEL_DIR / "confusion_matrix.csv"
 print("Loading dataset...")
 
 if not DATA_PATH.exists():
-    raise FileNotFoundError(
-        f"Dataset nahi mili: {DATA_PATH}"
-    )
+    raise FileNotFoundError(f"Dataset nahi mili: {DATA_PATH}")
 
 df = pd.read_csv(DATA_PATH)
 
@@ -42,9 +42,7 @@ if "Class" not in df.columns:
     raise ValueError("Dataset mein 'Class' column nahi mila.")
 
 if df.isnull().any().any():
-    raise ValueError(
-        "Dataset mein missing values hain. Pehle unhe inspect karo."
-    )
+    raise ValueError("Dataset mein missing values hain. Pehle unhe inspect karo.")
 
 X = df.drop(columns=["Class"])
 y = df["Class"]
@@ -92,6 +90,13 @@ report = classification_report(
     zero_division=0,
 )
 
+# ---------------- CURVE DATA ----------------
+fpr, tpr, _ = roc_curve(y_test, probabilities)
+
+pr_precision, pr_recall, _ = precision_recall_curve(
+    y_test, probabilities
+)
+
 metrics = {
     "model_name": "Random Forest",
     "dataset_rows": int(len(df)),
@@ -116,6 +121,16 @@ metrics = {
     "confusion_matrix": cm.tolist(),
     "classification_report": report,
     "feature_columns": list(X.columns),
+
+    # Actual held-out test-set data for dashboard curves
+    "roc_curve": {
+        "fpr": fpr.tolist(),
+        "tpr": tpr.tolist(),
+    },
+    "precision_recall_curve": {
+        "precision": pr_precision.tolist(),
+        "recall": pr_recall.tolist(),
+    },
 }
 
 print("\nClassification Report:")
@@ -123,6 +138,7 @@ print(
     classification_report(
         y_test,
         predictions,
+        labels=[0, 1],
         target_names=["Legitimate", "Fraud"],
         zero_division=0,
     )
@@ -133,10 +149,9 @@ print(f"ROC-AUC: {metrics['roc_auc']:.4f}")
 
 print("\nConfusion Matrix:")
 print(cm)
-print("\nMatrix order: [[TN, FP], [FN, TP]]")
+print("Matrix order: [[TN, FP], [FN, TP]]")
 
 # ---------------- SAVE ARTIFACTS ----------------
-# Save the model directly so app.py can call model.predict().
 joblib.dump(model, MODEL_PATH)
 
 with open(METRICS_PATH, "w", encoding="utf-8") as file:
