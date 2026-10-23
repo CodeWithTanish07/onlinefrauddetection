@@ -8,6 +8,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from sklearn.metrics import ConfusionMatrixDisplay
 import numpy as np
+from sklearn.metrics import roc_curve, precision_recall_curve
 
 # ---------------- CONFIG ----------------
 st.set_page_config(
@@ -24,28 +25,100 @@ METRICS_PATH = BASE / "artifacts" / "metrics.json"
 # ---------------- STYLE ----------------
 st.markdown("""
 <style>
+/* Main app */
 .stApp {
-    background: #0b1020;
-    color: #edf2ff;
+    background: linear-gradient(135deg, #080d19 0%, #101a2d 55%, #0b1220 100%);
+    color: #e8eefc;
 }
+
+/* Page spacing */
 .block-container {
-    max-width: 1250px;
-    padding-top: 1.8rem;
+    max-width: 1400px;
+    padding-top: 2rem;
+    padding-bottom: 3rem;
 }
-[data-testid="stMetric"] {
-    background: #151e32;
-    border: 1px solid #293852;
-    padding: 16px;
-    border-radius: 12px;
-}
+
+/* Sidebar */
 section[data-testid="stSidebar"] {
-    background: #111a2c;
+    background: #0b1322;
+    border-right: 1px solid #24324a;
 }
+
+section[data-testid="stSidebar"] .stRadio label {
+    color: #dce6fa;
+    font-weight: 500;
+}
+
+/* Metric cards */
+[data-testid="stMetric"] {
+    background: linear-gradient(145deg, #17243a, #111c2e);
+    border: 1px solid #2a3b56;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+[data-testid="stMetricLabel"] {
+    color: #a9bad5;
+    font-size: 0.9rem;
+}
+
+[data-testid="stMetricValue"] {
+    color: #f4f7ff;
+    font-weight: 700;
+}
+
+/* Headings */
+h1, h2, h3 {
+    color: #f4f7ff !important;
+    letter-spacing: -0.4px;
+}
+
+/* Buttons */
 div.stButton > button {
     width: 100%;
-    min-height: 44px;
+    min-height: 46px;
+    border-radius: 10px;
+    border: 1px solid #3b82f6;
+    background: linear-gradient(90deg, #2563eb, #3b82f6);
+    color: white;
+    font-weight: 650;
+    transition: all 0.2s ease;
+}
+
+div.stButton > button:hover {
+    border-color: #93c5fd;
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+/* Inputs */
+div[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div {
+    background: #111c2e;
+    border-color: #30415e;
     border-radius: 9px;
-    font-weight: 600;
+}
+
+/* Data tables */
+[data-testid="stDataFrame"] {
+    border: 1px solid #2a3b56;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Dividers and captions */
+hr {
+    border-color: #263650;
+}
+
+.stCaption {
+    color: #94a8c7;
+}
+
+/* Alerts */
+[data-testid="stAlert"] {
+    border-radius: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -149,6 +222,99 @@ if page == "Overview":
         "Dataset statistics actual Class labels se calculate kiye gaye hain. "
         "Ye model predictions ke counts nahi hain."
     )
+    st.divider()
+    st.subheader("📈 Advanced Fraud Analytics")
+
+    # Fraud vs legitimate transaction amount
+    left, right = st.columns(2)
+
+    with left:
+        st.markdown("#### Average Transaction Amount")
+
+        avg_amount = df.groupby("Class")["Amount"].mean()
+
+        fig, ax = plt.subplots()
+        ax.bar(
+            ["Legitimate", "Fraud"],
+            [
+                avg_amount.get(0, 0),
+                avg_amount.get(1, 0)
+            ]
+        )
+        ax.set_ylabel("Average amount")
+        ax.set_title("Average Amount by Transaction Class")
+        fig.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+
+    with right:
+        st.markdown("#### Fraud Transactions Over Time")
+
+        fraud_df = df[df["Class"] == 1].copy()
+
+        if not fraud_df.empty:
+            fraud_df["Time (hour)"] = (
+                fraud_df["Time"] // 3600
+            ).astype(int)
+
+            hourly_fraud = (
+                fraud_df.groupby("Time (hour)")
+                .size()
+                .reindex(range(48), fill_value=0)
+            )
+
+            fig, ax = plt.subplots()
+            ax.plot(
+                hourly_fraud.index,
+                hourly_fraud.values,
+                marker="o"
+            )
+            ax.set_xlabel("Dataset time bucket (hour)")
+            ax.set_ylabel("Fraud transactions")
+            ax.set_title("Fraud Count Across Dataset Timeline")
+            fig.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
+        else:
+            st.info("No fraud-labelled transactions available.")
+
+    st.divider()
+    st.markdown("#### 🔎 Transaction Data Explorer")
+
+    class_filter = st.selectbox(
+        "Filter transactions",
+        ["All", "Legitimate only", "Fraud only"],
+        key="overview_class_filter"
+    )
+
+    amount_min = float(df["Amount"].min())
+    amount_max = float(df["Amount"].max())
+
+    amount_range = st.slider(
+        "Transaction amount range",
+        min_value=amount_min,
+        max_value=amount_max,
+        value=(amount_min, amount_max),
+        key="overview_amount_range"
+    )
+
+    filtered_df = df[
+        df["Amount"].between(amount_range[0], amount_range[1])
+    ]
+
+    if class_filter == "Legitimate only":
+        filtered_df = filtered_df[filtered_df["Class"] == 0]
+    elif class_filter == "Fraud only":
+        filtered_df = filtered_df[filtered_df["Class"] == 1]
+
+    st.caption(f"{len(filtered_df):,} transactions match your filters.")
+
+    st.dataframe(
+        filtered_df[["Time", "Amount", "Class"]].head(500),
+        use_container_width=True,
+        hide_index=True
+    )
+
 
 # ---------------- TRANSACTION DETECTION ----------------
 elif page == "Transaction Detection":
@@ -281,6 +447,66 @@ elif page == "Model Performance":
         "Fraud recall batata hai ki actual fraud cases mein se kitne detect "
         "hue. High accuracy alone imbalanced data par sufficient nahi hoti."
     )
+    st.divider()
+    st.markdown("#### 📉 ROC Curve & Precision-Recall Curve")
+
+    # Curves require saved test-set predictions and true labels.
+    # Do not calculate them from training data or invent values.
+    roc_data = metrics.get("roc_curve", {})
+    pr_data = metrics.get("precision_recall_curve", {})
+
+    curve_left, curve_right = st.columns(2)
+
+    with curve_left:
+        st.markdown("##### ROC Curve")
+
+        if all(key in roc_data for key in ["fpr", "tpr"]):
+            fig, ax = plt.subplots()
+            ax.plot(
+                roc_data["fpr"],
+                roc_data["tpr"],
+                label=f"ROC-AUC = {metrics.get('roc_auc', 0):.3f}"
+            )
+            ax.plot([0, 1], [0, 1], linestyle="--")
+            ax.set_xlabel("False Positive Rate")
+            ax.set_ylabel("True Positive Rate")
+            ax.set_title("Receiver Operating Characteristic")
+            ax.legend()
+            fig.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
+        else:
+            st.info(
+                "ROC curve data saved nahi hai. "
+                "Training script mein test predictions save karni hongi."
+            )
+
+    with curve_right:
+        st.markdown("##### Precision-Recall Curve")
+
+        if all(key in pr_data for key in ["precision", "recall"]):
+            fig, ax = plt.subplots()
+            ax.plot(
+                pr_data["recall"],
+                pr_data["precision"],
+                label=(
+                    f"Average Precision = "
+                    f"{metrics.get('average_precision', 0):.3f}"
+                )
+            )
+            ax.set_xlabel("Recall")
+            ax.set_ylabel("Precision")
+            ax.set_title("Precision-Recall Curve")
+            ax.legend()
+            fig.tight_layout()
+            st.pyplot(fig)
+            plt.close(fig)
+        else:
+            st.info(
+                "Precision-recall curve data saved nahi hai. "
+                "Training script update karni hogi."
+            )
+
 
 # ---------------- ABOUT ----------------
 else:
